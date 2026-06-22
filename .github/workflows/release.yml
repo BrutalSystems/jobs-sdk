@@ -1,32 +1,56 @@
 name: Release (PyPI)
 
-# Publishes brutalsystems-jobs-core + brutalsystems-jobs-client to PyPI via
-# Trusted Publishing (OIDC) — no API token is stored anywhere. Fires when you
-# push a tag like `python-v0.1.0`. The tag's version should match the version
-# in the package pyproject.toml files.
+# Publishes the two packages to PyPI via Trusted Publishing (OIDC) — no API token
+# stored anywhere. Fires on a tag like `python-v0.1.0`.
+#
+# Each package is a SEPARATE job in its OWN GitHub environment, because PyPI keys
+# a trusted publisher on (owner, repo, workflow, environment) and rejects two
+# publishers sharing the identical tuple. So the two pending publishers use
+# distinct environments, and the OIDC token from each job must carry the matching
+# environment:
+#   brutalsystems-jobs-core   -> environment `pypi`
+#   brutalsystems-jobs-client -> environment `pypi-client`
 on:
   push:
     tags:
       - 'python-v*'
 
 jobs:
-  pypi:
+  jobs-core:
     runs-on: ubuntu-latest
-    environment: pypi          # must match the environment named in the PyPI trusted publisher
+    environment: pypi
     permissions:
-      id-token: write          # required: lets the job mint the OIDC token PyPI exchanges for a scoped upload token
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           python-version: '3.13'
-      - name: Build both distributions (sdist + wheel)
+      - name: Build brutalsystems-jobs-core (sdist + wheel)
         working-directory: python
-        run: |
-          uv build --package brutalsystems-jobs-core
-          uv build --package brutalsystems-jobs-client
-      - name: Publish to PyPI (Trusted Publishing)
+        run: uv build --package brutalsystems-jobs-core
+      - name: Publish brutalsystems-jobs-core
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist/
+
+  jobs-client:
+    runs-on: ubuntu-latest
+    environment: pypi-client
+    needs: [jobs-core]          # publish the client only after core succeeds (client depends on core)
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.13'
+      - name: Build brutalsystems-jobs-client (sdist + wheel)
+        working-directory: python
+        run: uv build --package brutalsystems-jobs-client
+      - name: Publish brutalsystems-jobs-client
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: python/dist/

@@ -8,7 +8,7 @@ PyPI directly, so there is **no API token stored anywhere**. The workflow is
 
 The two packages don't exist on PyPI yet, so use **pending publishers**. On
 <https://pypi.org> → *Your account* → *Publishing* → *Add a pending publisher*,
-add **one entry per package** (identical except the project name):
+add **one entry per package**:
 
 | Field | `brutalsystems-jobs-core` | `brutalsystems-jobs-client` |
 |-------|---------------------------|------------------------------|
@@ -16,11 +16,18 @@ add **one entry per package** (identical except the project name):
 | Owner | `BrutalSystems` | `BrutalSystems` |
 | Repository name | `jobs-sdk` | `jobs-sdk` |
 | Workflow name | `release.yml` | `release.yml` |
-| Environment name | `pypi` | `pypi` |
+| Environment name | **`pypi`** | **`pypi-client`** |
 
-(Optional but recommended: in the GitHub repo settings create an
-**Environment** named `pypi` and add required reviewers, so a human approves
-each publish.)
+> **Gotcha (learned the hard way):** PyPI keys a trusted publisher on the tuple
+> (owner, repo, workflow, **environment**) and refuses two publishers with the
+> *identical* tuple — and it reports the conflict as a misleading "Sorry,
+> something went wrong / PyPI is down" 503 page, not a clean validation error.
+> That's why the two packages use **different environment names**. `release.yml`
+> has a matching job per environment, so each OIDC token carries the right one.
+
+(Optional but recommended: in GitHub repo *Settings → Environments*, create
+`pypi` and `pypi-client` and add required reviewers, so a human approves each
+publish.)
 
 ## Cutting a release
 
