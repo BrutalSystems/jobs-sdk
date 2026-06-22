@@ -1,6 +1,6 @@
 # jobs-sdk
 
-Official client SDKs for **jobservice** — a job registration, lifecycle, and
+Official client SDKs for **jobs-service** — a job registration, lifecycle, and
 dispatch service. The service itself is private; these are the public clients
 any consumer uses to register jobs, trigger runs, and handle work.
 

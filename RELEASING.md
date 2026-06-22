@@ -45,7 +45,7 @@ trusted publishers automatically.
 
 ## After publishing — switch the service off the git dependency
 
-Once the packages are on PyPI, update the private `jobservice` repo to depend on
+Once the packages are on PyPI, update the private `jobs-service` repo to depend on
 the published version instead of git: drop the `[tool.uv.sources]` git entry and
 pin `brutalsystems-jobs-core==<version>` (and simplify the Dockerfile's git
 install to a plain `pip install`). That removes the `apt-get git` step too.

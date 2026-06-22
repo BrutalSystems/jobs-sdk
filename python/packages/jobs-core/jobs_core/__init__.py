@@ -1,4 +1,4 @@
-"""jobs-core — the shared wire contract for jobservice.
+"""jobs-core — the shared wire contract for jobs-service.
 
 One definition of everything that crosses the boundary between the SDK
 (jobs-client) and the service (jobs-service): the Job execution Policy, the AMQP
