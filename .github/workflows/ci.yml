@@ -26,8 +26,8 @@ jobs:
         run: uv run pytest -q
       - name: Build wheels
         run: |
-          uv build --package jobs-core
-          uv build --package jobs-client
+          uv build --package brutalsystems-jobs-core
+          uv build --package brutalsystems-jobs-client
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:

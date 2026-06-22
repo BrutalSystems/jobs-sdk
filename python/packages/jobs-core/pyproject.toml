@@ -1,7 +1,8 @@
 [project]
-name = "jobs-core"
+# Distribution name is branded; the import package stays `jobs_core`.
+name = "brutalsystems-jobs-core"
 version = "0.1.0"
-description = "Shared wire contract for jobservice — envelope, policy, and the JOBS_* pod-env contract. The single source of truth depended on by both jobs-client and jobs-service."
+description = "Shared wire contract for jobservice — envelope, policy, and the JOBS_* pod-env contract. The single source of truth depended on by both the SDK and the service. Import as `jobs_core`."
 requires-python = ">=3.13"
 dependencies = [
     "pydantic>=2.7.0",

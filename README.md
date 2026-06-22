@@ -22,6 +22,10 @@ them green, so the Python and (future) .NET clients can never silently diverge.
 
 ## Python — quickstart
 
+```sh
+pip install brutalsystems-jobs-client   # import name is `jobs_client`
+```
+
 ```python
 from jobs_client import JobsClient, Policy, register_handler
 

@@ -1,13 +1,13 @@
 # Virtual uv-workspace root for the Python SDK. Two distributables:
 #   jobs-core   — the wire contract (Policy, envelope, the JOBS_* pod-env names)
 #   jobs-client — the SDK that depends on it
-# Both publish to PyPI; consumers `pip install jobs-client`.
+# Both publish to PyPI; consumers `pip install brutalsystems-jobs-client`.
 [tool.uv.workspace]
 members = ["packages/*"]
 
 [tool.uv.sources]
-jobs-core = { workspace = true }
-jobs-client = { workspace = true }
+brutalsystems-jobs-core = { workspace = true }
+brutalsystems-jobs-client = { workspace = true }
 
 [dependency-groups]
 dev = [
