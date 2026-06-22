@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+defaults:
+  run:
+    working-directory: python
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.13'
+      - name: Sync
+        run: uv sync
+      - name: Lint
+        run: uv run ruff check .
+      - name: Contract tests
+        run: uv run pytest -q
+      - name: Build wheels
+        run: |
+          uv build --package jobs-core
+          uv build --package jobs-client
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-packages
+          path: python/dist/*

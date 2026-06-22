@@ -1,0 +1,15 @@
+[project]
+name = "jobs-core"
+version = "0.1.0"
+description = "Shared wire contract for jobservice — envelope, policy, and the JOBS_* pod-env contract. The single source of truth depended on by both jobs-client and jobs-service."
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.7.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["jobs_core"]
