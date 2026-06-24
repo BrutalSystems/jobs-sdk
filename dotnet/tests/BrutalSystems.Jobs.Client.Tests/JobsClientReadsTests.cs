@@ -34,6 +34,32 @@ public class JobsClientReadsTests
     }
 
     [Fact]
+    public async Task GetRunByExternalRef_throws_RunNotFoundException_on_404()
+    {
+        var stub = new StubHandler().Enqueue(HttpStatusCode.NotFound);
+        await Assert.ThrowsAsync<RunNotFoundException>(() => Make(stub).GetRunByExternalRefAsync("some-ref"));
+    }
+
+    [Fact]
+    public async Task GetRunByExternalRef_returns_json_and_sends_correct_request()
+    {
+        var stub = new StubHandler().Enqueue(HttpStatusCode.OK, "{\"id\":\"run-1\",\"external_ref\":\"abc-123\"}");
+        var result = await Make(stub).GetRunByExternalRefAsync("abc-123");
+        Assert.Equal("run-1", result.GetProperty("id").GetString());
+        Assert.Single(stub.Requests);
+        Assert.Equal(HttpMethod.Get, stub.Requests[0].Method);
+        Assert.EndsWith("/api/v1/runs/by-external-ref/abc-123", stub.Requests[0].Url);
+    }
+
+    [Fact]
+    public async Task ListJobsFiltered_parses_empty_list()
+    {
+        var stub = new StubHandler().Enqueue(HttpStatusCode.OK, "[]");
+        var jobs = await Make(stub).ListJobsFilteredAsync();
+        Assert.Empty(jobs);
+    }
+
+    [Fact]
     public void FromEnv_requires_service_url()
     {
         var prior = Environment.GetEnvironmentVariable("JOBS_SERVICE_URL");
