@@ -31,12 +31,27 @@ public class JobsClientRegisterTriggerTests
         var stub = new StubHandler().Enqueue(HttpStatusCode.OK,
             "{\"run_id\":\"r-1\",\"external_ref\":\"k8s-1\",\"job_id\":\"j-1\"}");
         var res = await Make(stub).TriggerAsync("brokenhip.ping",
-            args: new Dictionary<string, object?> { ["x"] = 1 });
+            cmd: new[] { "ping" },
+            args: new Dictionary<string, object?> { ["x"] = 1 },
+            runTenant: "acme", runUser: "alice");
 
         Assert.Equal("r-1", res.RunId);
         Assert.Equal("k8s-1", res.ExternalRef);
-        Assert.Equal("https://jobs.example.com/api/v1/jobs/by-name/brokenhip.ping/trigger",
-            stub.Requests[0].Url);
+        Assert.Equal("j-1", res.JobId);
+
+        var req = stub.Requests[0];
+        Assert.Equal("https://jobs.example.com/api/v1/jobs/by-name/brokenhip.ping/trigger", req.Url);
+
+        // Authorization header
+        Assert.Equal("Bearer tok", req.Auth);
+
+        // Outgoing body uses snake_case field names (not camelCase)
+        Assert.Contains("\"args\"", req.Body);
+        Assert.Contains("\"run_tenant\"", req.Body);
+        Assert.Contains("\"run_user\"", req.Body);
+        Assert.Contains("\"cmd\"", req.Body);
+        Assert.DoesNotContain("\"runTenant\"", req.Body);
+        Assert.DoesNotContain("\"runUser\"", req.Body);
     }
 
     [Fact]
@@ -51,6 +66,8 @@ public class JobsClientRegisterTriggerTests
 
         Assert.True(registered);
         Assert.Equal("r", res.RunId);
+        Assert.Equal("e", res.ExternalRef);
+        Assert.Equal("j", res.JobId);
         Assert.Equal(2, stub.Requests.Count);
     }
 
