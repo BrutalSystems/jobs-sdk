@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Prometheus;
+
+[assembly: InternalsVisibleTo("BrutalSystems.Jobs.Worker.Tests")]
 
 namespace BrutalSystems.Jobs.Worker;
 
@@ -70,7 +73,7 @@ public sealed class JobsMetrics
 public static class MetricsServer
 {
     /// <summary>Allows tests to read the OS-assigned port when port 0 is passed to Start.</summary>
-    public interface IHavePort
+    internal interface IHavePort
     {
         int Port { get; }
     }
@@ -98,11 +101,11 @@ public static class MetricsServer
                 HttpListenerContext ctx;
                 try { ctx = await listener.GetContextAsync(); }
                 catch { break; }
+                var h = metrics.Health(stalenessSeconds, heartbeat);
                 var (status, body, contentType) = ctx.Request.Url?.AbsolutePath switch
                 {
                     "/metrics" => (200, metrics.Render(), "text/plain; version=0.0.4"),
-                    "/healthz" => (metrics.Health(stalenessSeconds, heartbeat).Status,
-                                   metrics.Health(stalenessSeconds, heartbeat).Body, "text/plain"),
+                    "/healthz" => (h.Status, h.Body, "text/plain"),
                     _ => (404, "", "text/plain"),
                 };
                 var bytes = Encoding.UTF8.GetBytes(body);
@@ -115,6 +118,7 @@ public static class MetricsServer
         return new Stopper(listener, cts, boundPort);
     }
 
+    /// <summary>For test/ephemeral use only — production must always pass a real configured port (never 0), as the probe binds loopback only.</summary>
     private static int FindFreePort()
     {
         // Bind to port 0 to let the OS allocate an ephemeral port, then release it.
