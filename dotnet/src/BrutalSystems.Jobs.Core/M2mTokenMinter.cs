@@ -10,22 +10,28 @@ public sealed class M2mTokenMinter
 {
     private readonly RSA _key;
     private readonly string _ownerService, _tenantId, _kid;
+    private readonly TimeProvider _clock;
 
     public int TtlSeconds { get; }
 
     public M2mTokenMinter(RSA privateKey, string ownerService, string tenantId,
-        int ttlSeconds = 3600, string? kid = null)
+        int ttlSeconds = 3600, string? kid = null, TimeProvider? timeProvider = null)
     {
         _key = privateKey;
         _ownerService = ownerService;
         _tenantId = tenantId;
         TtlSeconds = ttlSeconds;
         _kid = kid ?? Kid.Compute(privateKey);
+        _clock = timeProvider ?? TimeProvider.System;
     }
 
-    public string Mint()
+    public string Mint() => MintAt(_clock.GetUtcNow());
+
+    /// <summary>Mints a token stamped at the given instant. Used by <c>TokenProvider</c>
+    /// to keep <c>iat</c>/<c>exp</c> aligned with an injected <see cref="TimeProvider"/>.</summary>
+    public string MintAt(DateTimeOffset at)
     {
-        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var now = at.ToUnixTimeSeconds();
         var claims = new Dictionary<string, object?>
         {
             ["iat"] = now,
