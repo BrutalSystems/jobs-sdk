@@ -18,7 +18,7 @@ public class MessageEnvelopeTests
         Assert.Equal("r1", back.RunId);
         Assert.Equal("brokenhip.ping", back.JobName);
         Assert.Equal(2, back.Attempt);
-        Assert.Equal(1.0, back.Args["x"]);
+        Assert.Equal(1L, back.Args["x"]);
     }
 
     [Fact]
@@ -43,20 +43,24 @@ public class MessageEnvelopeTests
 
         var back = MessageEnvelope.FromJsonBytes(env.ToJsonBytes());
 
-        Assert.Equal(42.0,  back.Args["count"]);
+        Assert.Equal(42L,   back.Args["count"]);
         Assert.Equal(1.5,   back.Args["ratio"]);
         Assert.Equal(true,  back.Args["flag"]);
         Assert.Null(back.Args["nothing"]);
+
+        // Prove int→long / float→double distinction is maintained
+        Assert.IsType<long>(back.Args["count"]);
+        Assert.IsType<double>(back.Args["ratio"]);
 
         var tags = Assert.IsType<List<object?>>(back.Args["tags"]);
         Assert.Equal(3, tags.Count);
         Assert.Equal("a",   tags[0]);
         Assert.Equal("b",   tags[1]);
-        Assert.Equal(99.0,  tags[2]);
+        Assert.Equal(99L,   tags[2]);
 
         var meta = Assert.IsType<Dictionary<string, object?>>(back.Args["meta"]);
         Assert.Equal("v",  meta["k"]);
-        Assert.Equal(7.0,  meta["n"]);
+        Assert.Equal(7L,   meta["n"]);
     }
 
     [Fact]
@@ -88,7 +92,7 @@ public class MessageEnvelopeTests
         Assert.Equal(3,             env.Attempt);
         Assert.Equal(new DateTimeOffset(2026, 6, 24, 9, 0, 0, TimeSpan.Zero), env.DispatchedAt);
         Assert.Equal("ORD-999",     env.Args["order_id"]);
-        Assert.Equal(5.0,           env.Args["quantity"]);
+        Assert.Equal(5L,            env.Args["quantity"]);
     }
 
     [Fact]

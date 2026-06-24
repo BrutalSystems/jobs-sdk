@@ -51,7 +51,7 @@ public sealed record MessageEnvelope
         JsonElement e => e.ValueKind switch
         {
             JsonValueKind.String => e.GetString(),
-            JsonValueKind.Number => e.TryGetInt64(out var l) ? l : e.GetDouble(),
+            JsonValueKind.Number => e.TryGetInt64(out var l) ? (object?)l : e.GetDouble(),
             JsonValueKind.True => true,
             JsonValueKind.False => false,
             JsonValueKind.Null => null,
