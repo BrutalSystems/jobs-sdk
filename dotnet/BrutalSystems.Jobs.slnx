@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BrutalSystems.Jobs.Core/BrutalSystems.Jobs.Core.csproj" />
+    <Project Path="src/BrutalSystems.Jobs.Client/BrutalSystems.Jobs.Client.csproj" />
+    <Project Path="src/BrutalSystems.Jobs.Worker/BrutalSystems.Jobs.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BrutalSystems.Jobs.Core.Tests/BrutalSystems.Jobs.Core.Tests.csproj" />
+    <Project Path="tests/BrutalSystems.Jobs.Client.Tests/BrutalSystems.Jobs.Client.Tests.csproj" />
+    <Project Path="tests/BrutalSystems.Jobs.Worker.Tests/BrutalSystems.Jobs.Worker.Tests.csproj" />
+  </Folder>
+</Solution>

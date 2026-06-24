@@ -1,0 +1,26 @@
+name: dotnet-release
+on:
+  push:
+    tags: ['dotnet-v*']
+permissions:
+  contents: read
+  id-token: write   # OIDC trusted publishing to nuget.org
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Derive version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#dotnet-v}" >> "$GITHUB_ENV"
+      - name: Test
+        run: dotnet test dotnet/BrutalSystems.Jobs.slnx -c Release
+      - name: Pack
+        run: |
+          dotnet pack dotnet/src/BrutalSystems.Jobs.Core   -c Release -p:PackageVersion=$VERSION -o out
+          dotnet pack dotnet/src/BrutalSystems.Jobs.Client -c Release -p:PackageVersion=$VERSION -o out
+          dotnet pack dotnet/src/BrutalSystems.Jobs.Worker -c Release -p:PackageVersion=$VERSION -o out
+      - name: Publish to nuget.org (OIDC)
+        run: dotnet nuget push "out/*.nupkg" --source https://api.nuget.org/v3/index.json --skip-duplicate

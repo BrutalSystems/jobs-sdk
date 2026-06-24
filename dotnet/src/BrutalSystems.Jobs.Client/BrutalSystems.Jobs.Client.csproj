@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>BrutalSystems.Jobs.Client</PackageId>
+    <Description>Producer client for the Brutal Systems jobs service: HTTP client (register/trigger/lifecycle) + caching m2m token provider.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BrutalSystems.Jobs.Core\BrutalSystems.Jobs.Core.csproj">
+      <PrivateAssets>none</PrivateAssets>
+    </ProjectReference>
+  </ItemGroup>
+</Project>
