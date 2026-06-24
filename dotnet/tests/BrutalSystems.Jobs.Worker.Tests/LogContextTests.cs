@@ -15,4 +15,32 @@ public class LogContextTests
         }
         Assert.Empty(LogContext.Current);
     }
+
+    [Fact]
+    public void Nested_bind_restores_outer_values_on_dispose()
+    {
+        using (LogContext.Bind("r-outer", "j-outer", "t-outer", "o-outer"))
+        {
+            Assert.Equal("r-outer", LogContext.Current["run_id"]);
+
+            using (LogContext.Bind("r-inner", "j-inner", "t-inner", "o-inner"))
+            {
+                Assert.Equal("r-inner", LogContext.Current["run_id"]);
+            }
+
+            Assert.Equal("r-outer", LogContext.Current["run_id"]);
+        }
+
+        Assert.Empty(LogContext.Current);
+    }
+
+    [Fact]
+    public async Task Context_flows_across_await()
+    {
+        using (LogContext.Bind("r-a", "j-a", "t-a", "o-a"))
+        {
+            await Task.Yield();
+            Assert.Equal("r-a", LogContext.Current["run_id"]);
+        }
+    }
 }
