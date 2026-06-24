@@ -64,7 +64,7 @@ wheels = [
 
 [[package]]
 name = "brutalsystems-jobs-client"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/jobs-client" }
 dependencies = [
     { name = "aio-pika" },
@@ -85,7 +85,7 @@ requires-dist = [
 
 [[package]]
 name = "brutalsystems-jobs-core"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/jobs-core" }
 dependencies = [
     { name = "pydantic" },

@@ -1,11 +1,11 @@
 [project]
 # Distribution name is branded; the import package stays `jobs_client`.
 name = "brutalsystems-jobs-client"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python SDK for jobs-service — HTTP client, pod wrapper, warm consumer, and handler registry. `pip install brutalsystems-jobs-client`, then `import jobs_client`."
 requires-python = ">=3.13"
 dependencies = [
-    "brutalsystems-jobs-core==0.1.0",
+    "brutalsystems-jobs-core==0.1.1",
     "httpx>=0.27",
     "pyjwt[crypto]>=2.10.0",
     "aio-pika>=9.5",

@@ -19,12 +19,19 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
+
 from jobs_client import HANDLERS
 from jobs_client import observability as obs
 from jobs_client.client import JobsClient
 from jobs_core import EXCHANGE_NAME, dead_queue_name, pod_env, retry_queue_name, work_queue_name
 
 logger = logging.getLogger(__name__)
+
+# HTTP statuses that are transient during a cold start (jobs-service's JWKS
+# fetch from the auth service may not be warm yet) and so worth retrying. A 4xx
+# outside this set is a real client error and should fail fast.
+_RETRYABLE_DISCOVERY_STATUSES = frozenset({401, 403, 502, 503, 504})
 
 
 @dataclass(frozen=True)
@@ -59,12 +66,43 @@ class WarmConsumerConfig:
 
 
 async def discover_warm_jobs(
-    *, client: JobsClient, owner_service: str,
+    *,
+    client: JobsClient,
+    owner_service: str,
+    max_attempts: int = 8,
+    base_delay: float = 0.5,
+    max_delay: float = 8.0,
 ) -> list[dict[str, Any]]:
-    """Query jobs-service for warm-queued Jobs owned by this service."""
-    return await client.list_jobs_filtered(
-        owner_service=owner_service, dispatch_mode="warm-queued",
-    )
+    """Query jobs-service for warm-queued Jobs owned by this service.
+
+    Retries transient failures with exponential backoff. The whole stack can
+    boot at once, so for the first few seconds jobs-service may be unreachable
+    or still answering 401 (its JWKS fetch from the auth service hasn't warmed).
+    This call runs before the AMQP reconnect loop and before the liveness
+    server, so without the retry a cold-start blip crashes the worker and
+    leans on an external supervisor to restart it. Real client errors (e.g.
+    400/404) are not transient and raise immediately."""
+    delay = base_delay
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return await client.list_jobs_filtered(
+                owner_service=owner_service, dispatch_mode="warm-queued",
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code not in _RETRYABLE_DISCOVERY_STATUSES or attempt == max_attempts:
+                raise
+            retry_reason = str(exc.response.status_code)
+        except httpx.TransportError as exc:  # connect/read/timeout — jobs-service not up yet
+            if attempt == max_attempts:
+                raise
+            retry_reason = type(exc).__name__
+        logger.warning(
+            "warm-job discovery attempt %d/%d failed (%s); retrying in %ss",
+            attempt, max_attempts, retry_reason, delay,
+        )
+        await asyncio.sleep(delay)
+        delay = min(delay * 2, max_delay)
+    raise AssertionError("unreachable: loop returns or raises")
 
 
 def validate_handlers(jobs: list[dict[str, Any]]) -> None:
