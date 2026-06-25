@@ -32,6 +32,11 @@ public static class PodEnv
     // m2m auth key the service injects so the SDK can mint tokens back
     public const string JwtPrivateKey = "JOBS_JWT_PRIVATE_KEY";
 
+    // W3C trace context (producer sets when tracing is active), so the wrapper can
+    // parent the handler's spans under the dispatch span (server -> wrapper -> handler).
+    public const string Traceparent = "JOBS_TRACEPARENT";
+    public const string Tracestate = "JOBS_TRACESTATE";
+
     /// <summary>Map a handler-arg key to its JOBS_ARG_* env var name.</summary>
     public static string ArgEnvName(string key) => $"{ArgPrefix}{key.ToUpperInvariant()}";
 }
