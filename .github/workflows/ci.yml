@@ -33,3 +33,17 @@ jobs:
         with:
           name: python-packages
           path: python/dist/*
+
+  dotnet:
+    runs-on: ubuntu-latest
+    # Override the top-level python working-directory for this job.
+    defaults:
+      run:
+        working-directory: dotnet
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test
+        run: dotnet test BrutalSystems.Jobs.slnx -c Release
