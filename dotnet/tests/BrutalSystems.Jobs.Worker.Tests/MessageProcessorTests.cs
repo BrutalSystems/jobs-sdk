@@ -54,7 +54,9 @@ public class MessageProcessorTests
 
         Assert.True(delivery.Acked);
         Assert.Equal(0, pub.Retries + pub.Deads);
-        Assert.Contains(stub.Requests, r => r.Url.EndsWith("/runs") && r.Body.Contains("\"trigger\":\"queue\""));
+        var startReq = Assert.Single(stub.Requests, r => r.Url.EndsWith("/runs") && r.Method == HttpMethod.Post);
+        Assert.Contains("\"trigger\":\"queue\"", startReq.Body);
+        Assert.Contains("\"run_id\":\"r1\"", startReq.Body);
         Assert.Contains(stub.Requests, r => r.Method == HttpMethod.Patch && r.Body.Contains("\"status\":\"succeeded\""));
     }
 

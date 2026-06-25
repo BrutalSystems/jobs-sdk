@@ -47,7 +47,7 @@ public sealed class MessageProcessor(HandlerRegistry registry, JobsClient client
         }
 
         using var _ = LogContext.Bind(env.RunId, env.JobId, env.TenantId, env.OwnerService);
-        await client.StartRunAsync(env.JobId, idempotencyKey: env.RunId, trigger: "queue", ct: ct);
+        await client.StartRunAsync(env.JobId, idempotencyKey: env.RunId, runId: env.RunId, trigger: "queue", ct: ct);
 
         var started = TimeProvider.System.GetTimestamp();
         IReadOnlyDictionary<string, object?>? summary = null;
