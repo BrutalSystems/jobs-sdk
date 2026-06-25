@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 
+from jobs_client import adopt_trace_context
 from jobs_client._tracing import handler_trace_context
 from jobs_core import pod_env
 
@@ -66,6 +67,28 @@ def test_always_yields_a_mergeable_dict(monkeypatch):
         assert isinstance(sub_env, dict)
         env = {"X": "1", **sub_env}  # merge must not raise
         assert env["X"] == "1"
+
+
+def test_adopt_trace_context_nests_handler_under_dispatch(monkeypatch):
+    """The consumer-facing helper: after adopt_trace_context(), a span the handler
+    starts shares the injected trace id (no longer an orphaned root)."""
+    from opentelemetry import context as otel_context
+    from opentelemetry import trace
+
+    monkeypatch.setenv(pod_env.TRACEPARENT, _INCOMING)
+    token = adopt_trace_context()
+    try:
+        with trace.get_tracer("handler").start_as_current_span("work") as span:
+            assert f"{span.get_span_context().trace_id:032x}" == _PARENT_TRACE_ID
+    finally:
+        if token is not None:
+            otel_context.detach(token)
+
+
+def test_adopt_trace_context_is_noop_without_env(monkeypatch):
+    monkeypatch.delenv(pod_env.TRACEPARENT, raising=False)
+    monkeypatch.delenv(pod_env.TRACESTATE, raising=False)
+    assert adopt_trace_context() is None
 
 
 def test_degrades_to_forwarding_when_otel_absent(monkeypatch):

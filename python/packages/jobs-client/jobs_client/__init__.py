@@ -22,6 +22,7 @@ For warm-queued Jobs, register handlers and let the warm consumer dispatch:
 # existing `from jobs_client import Policy` call sites keep working.
 from jobs_core import Policy, Resources
 
+from ._tracing import adopt_trace_context
 from .client import JobsClient
 from .exceptions import TransientError
 from .handlers import HANDLERS, register_handler
@@ -33,4 +34,5 @@ __all__ = [
     "TransientError",
     "HANDLERS",
     "register_handler",
+    "adopt_trace_context",
 ]

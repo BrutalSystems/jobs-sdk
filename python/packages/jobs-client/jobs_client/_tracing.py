@@ -50,6 +50,30 @@ def _carrier_to_pod_env(carrier: dict[str, str]) -> dict[str, str]:
     }
 
 
+def adopt_trace_context() -> object | None:
+    """Adopt the dispatch trace context the wrapper forwarded as JOBS_TRACEPARENT,
+    so this handler's spans nest under the run/dispatch span instead of starting a
+    fresh root trace.
+
+    The handler runs as a subprocess of the wrapper, launched under
+    `opentelemetry-instrument` — but the launcher does NOT read JOBS_TRACEPARENT
+    (or TRACEPARENT) from the env, so without this call the handler's trace is
+    orphaned. Call it ONCE at handler startup, before any span is created (top of
+    your entrypoint, or a sitecustomize on the handler image).
+
+    Safe no-op when there's no forwarded context or OpenTelemetry isn't installed.
+    Returns the opaque attach token (or None); most handlers can ignore it."""
+    carrier = _incoming_carrier()
+    if not carrier:
+        return None
+    try:
+        from opentelemetry.context import attach
+        from opentelemetry.propagate import extract
+    except ImportError:
+        return None
+    return attach(extract(carrier))
+
+
 @contextmanager
 def handler_trace_context() -> Iterator[dict[str, str]]:
     """Parent the run under the dispatch trace; yield env vars to forward the
