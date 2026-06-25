@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>BrutalSystems.Jobs.Core</PackageId>
+    <Description>Wire contract for the Brutal Systems jobs service: Policy, AMQP envelope, queue names, JOBS_* pod-env constants, RS256 m2m token minting + JWKS.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+</Project>

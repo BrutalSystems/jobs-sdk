@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>BrutalSystems.Jobs.Worker</PackageId>
+    <Description>Runtime for the Brutal Systems jobs service: handler registry, RabbitMQ warm consumer, pod wrapper, and Prometheus observability.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="RabbitMQ.Client" Version="7.1.2" />
+    <PackageReference Include="prometheus-net" Version="8.2.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BrutalSystems.Jobs.Core\BrutalSystems.Jobs.Core.csproj">
+      <PrivateAssets>none</PrivateAssets>
+    </ProjectReference>
+    <ProjectReference Include="..\BrutalSystems.Jobs.Client\BrutalSystems.Jobs.Client.csproj">
+      <PrivateAssets>none</PrivateAssets>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>BrutalSystems.Jobs.Worker.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

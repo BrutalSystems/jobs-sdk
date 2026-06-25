@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <Version>0.1.0-dev</Version>
+    <Authors>Brutal Systems</Authors>
+    <Company>Brutal Systems</Company>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/brutalsystems/jobs-sdk</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/brutalsystems/jobs-sdk</PackageProjectUrl>
+  </PropertyGroup>
+</Project>
