@@ -60,8 +60,8 @@ public class PodWrapperRunAsyncTests
 
             var client = MakeClient(stub);
 
-            // Inject a fake runner that returns exit code 0.
-            ProcessRunner fakeRunner = (_, _, _, _) => Task.FromResult(0);
+            // Inject a fake runner that returns exit code 0 and no summary.
+            ProcessRunner fakeRunner = (_, _, _, _, _) => Task.FromResult(new ProcessResult(0, null));
 
             var exitCode = await PodWrapper.RunAsync(client, CancellationToken.None, runner: fakeRunner);
 
@@ -95,7 +95,7 @@ public class PodWrapperRunAsyncTests
 
             var client = MakeClient(stub);
 
-            ProcessRunner fakeRunner = (_, _, _, _) => Task.FromResult(3);
+            ProcessRunner fakeRunner = (_, _, _, _, _) => Task.FromResult(new ProcessResult(3, null));
 
             var exitCode = await PodWrapper.RunAsync(client, CancellationToken.None, runner: fakeRunner);
 
@@ -130,7 +130,7 @@ public class PodWrapperRunAsyncTests
             var client = MakeClient(stub);
 
             // The runner should never be called; use a sentinel that throws if it is.
-            ProcessRunner shouldNotRun = (_, _, _, _) => throw new InvalidOperationException("runner must not be called");
+            ProcessRunner shouldNotRun = (_, _, _, _, _) => throw new InvalidOperationException("runner must not be called");
 
             await Assert.ThrowsAsync<HttpRequestException>(
                 () => PodWrapper.RunAsync(client, CancellationToken.None, runner: shouldNotRun));
@@ -148,6 +148,78 @@ public class PodWrapperRunAsyncTests
             ClearRequiredEnv();
             if (File.Exists(bufPath)) File.Delete(bufPath);
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Summary flows to finish_run — pins the regression
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Summary_from_runner_flows_to_finish_run()
+    {
+        SetRequiredEnv();
+        try
+        {
+            var stub = new StubHandler()
+                .Enqueue(HttpStatusCode.Created, "{\"run_id\":\"r-summary\"}")  // start_run
+                .Enqueue(HttpStatusCode.OK, "{\"status\":\"succeeded\"}");      // finish_run
+
+            var client = MakeClient(stub);
+
+            // Fake runner returns exit 0 with a non-null summary dict.
+            IReadOnlyDictionary<string, object?> fakeSummary = new Dictionary<string, object?>
+            {
+                ["rows"] = (object?)5,
+            };
+            ProcessRunner fakeRunner = (_, _, _, _, _) =>
+                Task.FromResult(new ProcessResult(0, fakeSummary));
+
+            var exitCode = await PodWrapper.RunAsync(client, CancellationToken.None, runner: fakeRunner);
+
+            Assert.Equal(0, exitCode);
+
+            // finish_run body must carry the summary payload.
+            var finishReq = Assert.Single(stub.Requests, r => r.Method == HttpMethod.Patch);
+            Assert.Contains("\"summary\"", finishReq.Body);
+            Assert.Contains("\"rows\"", finishReq.Body);
+        }
+        finally { ClearRequiredEnv(); }
+    }
+
+    // -----------------------------------------------------------------------
+    // Stdout lines are streamed to LogAsync via onStdoutLine callback
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task StdoutLines_are_streamed_to_LogAsync()
+    {
+        SetRequiredEnv();
+        try
+        {
+            var stub = new StubHandler()
+                .Enqueue(HttpStatusCode.Created, "{\"run_id\":\"r-log\"}")   // start_run
+                .Enqueue(HttpStatusCode.OK, "{}")                             // LogAsync POST (best-effort, swallowed)
+                .Enqueue(HttpStatusCode.OK, "{\"status\":\"succeeded\"}");   // finish_run
+
+            var client = MakeClient(stub);
+
+            // Fake runner invokes onStdoutLine with a test line before returning.
+            ProcessRunner fakeRunner = async (_, _, _, onStdoutLine, _) =>
+            {
+                await onStdoutLine("hello from handler");
+                return new ProcessResult(0, null);
+            };
+
+            var exitCode = await PodWrapper.RunAsync(client, CancellationToken.None, runner: fakeRunner);
+
+            Assert.Equal(0, exitCode);
+
+            // A POST to the /logs endpoint must have been captured with the line content.
+            var logReq = Assert.Single(stub.Requests,
+                r => r.Method == HttpMethod.Post && r.Url.EndsWith("/logs"));
+            Assert.Contains("hello from handler", logReq.Body);
+        }
+        finally { ClearRequiredEnv(); }
     }
 
     // -----------------------------------------------------------------------

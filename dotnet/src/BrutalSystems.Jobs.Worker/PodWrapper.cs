@@ -5,13 +5,19 @@ using BrutalSystems.Jobs.Core;
 
 namespace BrutalSystems.Jobs.Worker;
 
-/// <summary>Delegate seam for the subprocess execution step. Receives the executable path and the
-/// per-handler env vars, launches (or fakes) the process, and returns the exit code.
+/// <summary>Result returned by a <see cref="ProcessRunner"/> invocation.</summary>
+/// <param name="ExitCode">The process exit code.</param>
+/// <param name="Summary">Parsed summary dict from a <c>__JOBS_SUMMARY__</c> line, or null.</param>
+internal record ProcessResult(int ExitCode, IReadOnlyDictionary<string, object?>? Summary);
+
+/// <summary>Delegate seam for the subprocess execution step. Receives the executable path, per-handler
+/// flags, per-handler env vars, a per-stdout-line callback, and returns a <see cref="ProcessResult"/>.
 /// The real implementation is <see cref="PodWrapper.RealProcessRunner"/>.</summary>
-internal delegate Task<int> ProcessRunner(
+internal delegate Task<ProcessResult> ProcessRunner(
     string[] cmdArgv,
     IReadOnlyList<string> handlerFlags,
     IReadOnlyDictionary<string, string> argEnv,
+    Func<string, Task> onStdoutLine,
     CancellationToken ct);
 
 /// <summary>Pod entrypoint that wraps a handler subprocess with jobs-service lifecycle calls.
@@ -59,12 +65,13 @@ public static class PodWrapper
     }
 
     /// <summary>Real subprocess runner: launches the process, drains stdout/stderr, waits, and
-    /// returns the exit code. Kills the process tree on cancellation. Stderr is drained
-    /// concurrently and always awaited in a finally block.</summary>
-    internal static async Task<int> RealProcessRunner(
+    /// returns the exit code + any extracted summary. Kills the process tree on cancellation. Stderr
+    /// is drained concurrently and always awaited in a finally block.</summary>
+    internal static async Task<ProcessResult> RealProcessRunner(
         string[] cmdArgv,
         IReadOnlyList<string> handlerFlags,
         IReadOnlyDictionary<string, string> argEnv,
+        Func<string, Task> onStdoutLine,
         CancellationToken ct)
     {
         var psi = new ProcessStartInfo
@@ -81,6 +88,7 @@ public static class PodWrapper
         foreach (var (k, v) in argEnv) psi.Environment[k] = v;
 
         using var proc = Process.Start(psi)!;
+        IReadOnlyDictionary<string, object?>? summary = null;
 
         // Drain stderr concurrently; pass ct so it stops promptly on cancellation.
         // Wrap the drain body so failures are non-fatal (IO/cancellation swallowed inside).
@@ -100,7 +108,11 @@ public static class PodWrapper
         {
             string? line;
             while ((line = await proc.StandardOutput.ReadLineAsync(ct)) is not null)
+            {
                 Console.WriteLine(line);
+                await onStdoutLine(line);
+                summary = ExtractSummary(line) ?? summary;
+            }
 
             await proc.WaitForExitAsync(ct);
         }
@@ -116,7 +128,7 @@ public static class PodWrapper
             await stderrDrain.ConfigureAwait(false);
         }
 
-        return proc.ExitCode;
+        return new ProcessResult(proc.ExitCode, summary);
     }
 
     /// <summary>Full pod lifecycle. Reads JOBS_* env, resolves the job id, starts the run, spawns the
@@ -180,12 +192,15 @@ public static class PodWrapper
         var handlerFlags = ArgsToFlags(handlerArgs);
         var argEnv = ArgsToEnv(handlerArgs);
 
-        var exitCode = await runner(cmdArgv.ToArray(), handlerFlags, argEnv, ct);
+        var result = await runner(cmdArgv.ToArray(), handlerFlags, argEnv,
+            line => client.LogAsync(jobId, runId, line, ct), ct);
 
+        var exitCode = result.ExitCode;
+        var summary = result.Summary;
         var status = exitCode == 0 ? "succeeded" : "failed";
         try
         {
-            await client.FinishRunAsync(jobId, runId, status, exitCode, null, ct);
+            await client.FinishRunAsync(jobId, runId, status, exitCode, summary, ct);
         }
         catch (Exception exc)
         {
