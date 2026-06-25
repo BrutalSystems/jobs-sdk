@@ -25,8 +25,9 @@ public class MessageProcessorTests
     private sealed class FakePublisher : IRetryPublisher
     {
         public int Retries, Deads;
-        public Task PublishRetryAsync(MessageEnvelope e, int a, string r, CancellationToken ct) { Retries++; return Task.CompletedTask; }
-        public Task PublishDeadAsync(MessageEnvelope e, int a, string r, CancellationToken ct) { Deads++; return Task.CompletedTask; }
+        public int LastRetryAttempt, LastDeadAttempts;
+        public Task PublishRetryAsync(MessageEnvelope e, int a, string r, CancellationToken ct) { Retries++; LastRetryAttempt = a; return Task.CompletedTask; }
+        public Task PublishDeadAsync(MessageEnvelope e, int a, string r, CancellationToken ct) { Deads++; LastDeadAttempts = a; return Task.CompletedTask; }
     }
 
     // start_run returns {run_id}; finish_run returns {status}. Enqueue per call the processor makes.
@@ -69,6 +70,7 @@ public class MessageProcessorTests
 
         Assert.Equal(1, pub.Retries);
         Assert.Equal(0, pub.Deads);
+        Assert.Equal(2, pub.LastRetryAttempt);  // attempt=1 → retry at attempt+1=2
         Assert.True(delivery.Acked);
         Assert.DoesNotContain(stub.Requests, r => r.Method == HttpMethod.Patch);  // no finish_run
     }
@@ -85,6 +87,7 @@ public class MessageProcessorTests
         await proc.ProcessAsync(delivery, pub, maxAttempts: 5, timeout: TimeSpan.FromSeconds(5));
 
         Assert.Equal(1, pub.Deads);
+        Assert.Equal(5, pub.LastDeadAttempts);  // attempt=5/max=5 → dead published with attempt=5, not 6
         Assert.Contains(stub.Requests, r => r.Method == HttpMethod.Patch && r.Body.Contains("\"status\":\"failed\""));
         Assert.True(delivery.Acked);
     }
@@ -134,5 +137,22 @@ public class MessageProcessorTests
 
         Assert.Equal("hi", seen!["note"]);   // string, not JsonElement
         Assert.Equal(7L, seen["count"]);     // long, not JsonElement
+    }
+
+    [Fact]
+    public async Task Permanent_exception_finishes_failed_without_dead_or_retry_and_acks()
+    {
+        var (proc, stub, _) = Build((_, _) => throw new InvalidOperationException("permanent failure"));
+        stub.Enqueue(HttpStatusCode.Created, "{\"run_id\":\"r1\"}")      // start_run
+            .Enqueue(HttpStatusCode.OK, "{\"status\":\"failed\"}");       // finish_run
+        var delivery = new FakeDelivery(Env().ToJsonBytes());
+        var pub = new FakePublisher();
+
+        await proc.ProcessAsync(delivery, pub, maxAttempts: 5, timeout: TimeSpan.FromSeconds(5));
+
+        Assert.Equal(0, pub.Deads);
+        Assert.Equal(0, pub.Retries);
+        Assert.Contains(stub.Requests, r => r.Method == HttpMethod.Patch && r.Body.Contains("\"status\":\"failed\""));
+        Assert.True(delivery.Acked);
     }
 }
