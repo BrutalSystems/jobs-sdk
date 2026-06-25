@@ -23,7 +23,9 @@ public static class RetryQueueArguments
 /// _consume_one_job topology, and _poll_warm_queue_depths poller).
 ///
 /// Each warm job gets its OWN channel with ConsumerDispatchConcurrency and BasicQos set to
-/// that job's policy.concurrency — matching the Python _consume_one_job semantics exactly.
+/// that job's policy.concurrency — matching the per-job concurrency intent of Python
+/// _consume_one_job (Python uses a shared channel with per-consumer QoS; we use a dedicated
+/// channel per job).
 /// Publisher confirms are NOT enabled (parity with Python).</summary>
 public sealed class WarmConsumer(
     WarmConsumerConfig config, JobsClient client, HandlerRegistry registry,

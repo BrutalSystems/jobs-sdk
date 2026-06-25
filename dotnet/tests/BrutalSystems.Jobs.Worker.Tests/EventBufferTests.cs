@@ -16,6 +16,7 @@ public class EventBufferTests
         var lines = File.ReadAllLines(path);
         Assert.Equal(2, lines.Length);
         Assert.Equal("start_run", JsonDocument.Parse(lines[0]).RootElement.GetProperty("kind").GetString());
+        Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
     }
 
     [Fact]

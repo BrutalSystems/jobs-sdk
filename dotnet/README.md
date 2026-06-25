@@ -20,6 +20,27 @@ await client.RegisterJobAsync("lead-gen.score", schedule: null,
 await client.TriggerAsync("lead-gen.score", args: new Dictionary<string, object?> { ["lead_id"] = "01J" });
 ```
 
+## Install (local dev-bridge feed)
+
+Wire up the `local-nuget/` feed by adding a `nuget.config` alongside your `.csproj`:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="local-nuget" value="./local-nuget" />
+  </packageSources>
+</configuration>
+```
+
+Then reference the packages:
+
+```xml
+<PackageReference Include="BrutalSystems.Jobs.Core"   Version="0.1.0-dev" />
+<PackageReference Include="BrutalSystems.Jobs.Client" Version="0.1.0-dev" />
+<PackageReference Include="BrutalSystems.Jobs.Worker" Version="0.1.0-dev" />
+```
+
 ## Warm consumer
 
 ```csharp
