@@ -223,6 +223,43 @@ public class PodWrapperRunAsyncTests
     }
 
     // -----------------------------------------------------------------------
+    // Trace context is forwarded into the handler subprocess env
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Forwards_JOBS_TRACEPARENT_into_handler_env()
+    {
+        SetRequiredEnv();
+        Environment.SetEnvironmentVariable(PodEnv.Traceparent, "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01");
+        try
+        {
+            var stub = new StubHandler()
+                .Enqueue(HttpStatusCode.Created, "{\"run_id\":\"r-tp\"}")
+                .Enqueue(HttpStatusCode.OK, "{\"status\":\"succeeded\"}");
+            var client = MakeClient(stub);
+
+            IReadOnlyDictionary<string, string>? captured = null;
+            ProcessRunner capturingRunner = (_, _, argEnv, _, _) =>
+            {
+                captured = argEnv;
+                return Task.FromResult(new ProcessResult(0, null));
+            };
+
+            await PodWrapper.RunAsync(client, CancellationToken.None, runner: capturingRunner);
+
+            Assert.NotNull(captured);
+            Assert.Equal(
+                "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+                captured![PodEnv.Traceparent]);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(PodEnv.Traceparent, null);
+            ClearRequiredEnv();
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // (Optional) Real-subprocess smoke test: exit 3 → failed
     // -----------------------------------------------------------------------
 

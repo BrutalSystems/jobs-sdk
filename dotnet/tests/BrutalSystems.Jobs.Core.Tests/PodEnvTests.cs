@@ -20,6 +20,8 @@ public class PodEnvTests
         Assert.Equal("JOBS_BUFFER_PATH", PodEnv.BufferPath);
         Assert.Equal("/var/run/jobs-buffer.jsonl", PodEnv.BufferPathDefault);
         Assert.Equal("JOBS_JWT_PRIVATE_KEY", PodEnv.JwtPrivateKey);
+        Assert.Equal("JOBS_TRACEPARENT", PodEnv.Traceparent);
+        Assert.Equal("JOBS_TRACESTATE", PodEnv.Tracestate);
     }
 
     [Fact]

@@ -190,7 +190,10 @@ public static class PodWrapper
         }
 
         var handlerFlags = ArgsToFlags(handlerArgs);
-        var argEnv = ArgsToEnv(handlerArgs);
+        var argEnv = new Dictionary<string, string>(ArgsToEnv(handlerArgs));
+        // Forward the trace context so the handler's spans nest under the dispatch span
+        // (no-op merge when tracing is off). The handler adopts it via TraceContext.AdoptTraceContext().
+        foreach (var (k, v) in TraceContext.HandlerEnv()) argEnv[k] = v;
 
         var result = await runner(cmdArgv.ToArray(), handlerFlags, argEnv,
             line => client.LogAsync(jobId, runId, line, ct), ct);
