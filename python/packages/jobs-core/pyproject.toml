@@ -1,7 +1,7 @@
 [project]
 # Distribution name is branded; the import package stays `jobs_core`.
 name = "brutalsystems-jobs-core"
-version = "0.1.1"
+version = "0.1.2"
 description = "Shared wire contract for jobs-service — envelope, policy, and the JOBS_* pod-env contract. The single source of truth depended on by both the SDK and the service. Import as `jobs_core`."
 requires-python = ">=3.13"
 dependencies = [

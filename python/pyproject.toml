@@ -14,6 +14,9 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=1.3.0",
     "ruff>=0.6",
+    # Exercise the wrapper's active-tracing path (the `otel` extra) in tests.
+    "opentelemetry-api>=1.27",
+    "opentelemetry-sdk>=1.27",
 ]
 
 [tool.pytest.ini_options]

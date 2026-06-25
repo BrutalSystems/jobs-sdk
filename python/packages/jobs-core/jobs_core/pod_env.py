@@ -51,6 +51,15 @@ BUFFER_PATH_DEFAULT = "/var/run/jobs-buffer.jsonl"
 # agree on the name. Neutral; was "SAI_JWT_PRIVATE_KEY" pre-extraction. ---
 JWT_PRIVATE_KEY = "JOBS_JWT_PRIVATE_KEY"
 
+# --- W3C trace context (producer sets when tracing is active) ---
+# The service injects the active span's traceparent/tracestate so the wrapper can
+# parent the handler's spans under the dispatch span (server -> wrapper -> handler).
+# Standard W3C values (https://www.w3.org/TR/trace-context/); carried as env across
+# the pod boundary because there is no HTTP request to propagate them on. Absent
+# when the dispatcher isn't traced — the wrapper treats that as "no parent".
+TRACEPARENT = "JOBS_TRACEPARENT"
+TRACESTATE = "JOBS_TRACESTATE"
+
 
 def arg_env_name(key: str) -> str:
     """Map a handler-arg key to its JOBS_ARG_* env var name."""

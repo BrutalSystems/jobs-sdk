@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from jobs_client._buffer import EventBuffer
+from jobs_client._tracing import handler_trace_context
 from jobs_client.client import JobsClient
 from jobs_core import pod_env
 
@@ -140,53 +141,58 @@ async def _run(*, client: JobsClient) -> int:
     pod_uid = os.environ.get(pod_env.POD_UID) or str(uuid.uuid4())
     trigger = "api" if env.run_id else "schedule"
 
-    try:
-        run_id = await client.start_run(
-            job_id=job_id, run_id=env.run_id,
-            idempotency_key=pod_uid, trigger=trigger,
-        )
-    except Exception as exc:
-        buffer.write({
-            "kind": "start_run", "job_id": job_id,
-            "run_id_env": env.run_id, "name": env.name,
-            "idempotency_key": pod_uid, "error": str(exc),
-        })
-        raise
-
-    sub_env = dict(os.environ)
-    sub_env.update(_args_to_env(env.handler_args))
-
-    proc = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, env=sub_env,
-    )
-    summary: dict[str, Any] | None = None
-    for line in proc.stdout:
-        sys.stdout.write(line)
+    # Run the lifecycle under a span parented on the dispatch trace (no-op when
+    # tracing is off). `trace_sub_env` carries the active context forward so the
+    # handler subprocess's spans link under it.
+    with handler_trace_context() as trace_sub_env:
         try:
-            await client.log(job_id=job_id, run_id=run_id, line=line.rstrip("\n"))
-        except Exception:
-            pass  # log is best-effort
-        if line.startswith(_SUMMARY_MARKER):
-            try:
-                summary = json.loads(line[len(_SUMMARY_MARKER):].strip())
-            except json.JSONDecodeError:
-                summary = None
+            run_id = await client.start_run(
+                job_id=job_id, run_id=env.run_id,
+                idempotency_key=pod_uid, trigger=trigger,
+            )
+        except Exception as exc:
+            buffer.write({
+                "kind": "start_run", "job_id": job_id,
+                "run_id_env": env.run_id, "name": env.name,
+                "idempotency_key": pod_uid, "error": str(exc),
+            })
+            raise
 
-    exit_code = proc.wait()
-    status = "succeeded" if exit_code == 0 else "failed"
+        sub_env = dict(os.environ)
+        sub_env.update(_args_to_env(env.handler_args))
+        sub_env.update(trace_sub_env)
 
-    try:
-        await client.finish_run(
-            job_id=job_id, run_id=run_id,
-            status=status, exit_code=exit_code, summary=summary,
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, env=sub_env,
         )
-    except Exception as exc:
-        buffer.write({
-            "kind": "finish_run", "job_id": job_id, "run_id": run_id,
-            "status": status, "exit_code": exit_code, "summary": summary,
-            "error": str(exc),
-        })
+        summary: dict[str, Any] | None = None
+        for line in proc.stdout:
+            sys.stdout.write(line)
+            try:
+                await client.log(job_id=job_id, run_id=run_id, line=line.rstrip("\n"))
+            except Exception:
+                pass  # log is best-effort
+            if line.startswith(_SUMMARY_MARKER):
+                try:
+                    summary = json.loads(line[len(_SUMMARY_MARKER):].strip())
+                except json.JSONDecodeError:
+                    summary = None
+
+        exit_code = proc.wait()
+        status = "succeeded" if exit_code == 0 else "failed"
+
+        try:
+            await client.finish_run(
+                job_id=job_id, run_id=run_id,
+                status=status, exit_code=exit_code, summary=summary,
+            )
+        except Exception as exc:
+            buffer.write({
+                "kind": "finish_run", "job_id": job_id, "run_id": run_id,
+                "status": status, "exit_code": exit_code, "summary": summary,
+                "error": str(exc),
+            })
 
     return exit_code
 
