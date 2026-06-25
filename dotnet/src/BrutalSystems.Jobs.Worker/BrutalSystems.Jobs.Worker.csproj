@@ -17,4 +17,9 @@
       <PrivateAssets>none</PrivateAssets>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>BrutalSystems.Jobs.Worker.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>

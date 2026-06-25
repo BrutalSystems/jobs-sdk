@@ -5,6 +5,15 @@ using BrutalSystems.Jobs.Core;
 
 namespace BrutalSystems.Jobs.Worker;
 
+/// <summary>Delegate seam for the subprocess execution step. Receives the executable path and the
+/// per-handler env vars, launches (or fakes) the process, and returns the exit code.
+/// The real implementation is <see cref="PodWrapper.RealProcessRunner"/>.</summary>
+internal delegate Task<int> ProcessRunner(
+    string[] cmdArgv,
+    IReadOnlyList<string> handlerFlags,
+    IReadOnlyDictionary<string, string> argEnv,
+    CancellationToken ct);
+
 /// <summary>Pod entrypoint that wraps a handler subprocess with jobs-service lifecycle calls.
 /// Port of jobs_client.wrapper. Invoke RunAsync from a console <c>Main</c> in the pod image.</summary>
 public static class PodWrapper
@@ -49,11 +58,80 @@ public static class PodWrapper
         catch (JsonException) { return null; }
     }
 
+    /// <summary>Real subprocess runner: launches the process, drains stdout/stderr, waits, and
+    /// returns the exit code. Kills the process tree on cancellation. Stderr is drained
+    /// concurrently and always awaited in a finally block.</summary>
+    internal static async Task<int> RealProcessRunner(
+        string[] cmdArgv,
+        IReadOnlyList<string> handlerFlags,
+        IReadOnlyDictionary<string, string> argEnv,
+        CancellationToken ct)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = cmdArgv[0],
+            RedirectStandardOutput = true,
+            // Drain stderr to avoid the classic stdout+stderr pipe deadlock: if both pipes fill
+            // and nothing reads them, WaitForExitAsync hangs forever. We redirect and consume it.
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        foreach (var a in cmdArgv.Skip(1)) psi.ArgumentList.Add(a);
+        foreach (var f in handlerFlags) psi.ArgumentList.Add(f);
+        foreach (var (k, v) in argEnv) psi.Environment[k] = v;
+
+        using var proc = Process.Start(psi)!;
+
+        // Drain stderr concurrently; pass ct so it stops promptly on cancellation.
+        // Wrap the drain body so failures are non-fatal (IO/cancellation swallowed inside).
+        var stderrDrain = Task.Run(async () =>
+        {
+            try
+            {
+                string? errLine;
+                while ((errLine = await proc.StandardError.ReadLineAsync(ct)) is not null)
+                    Console.Error.WriteLine(errLine);
+            }
+            catch (OperationCanceledException) { /* drain cancelled — expected */ }
+            catch (Exception) { /* non-fatal: stderr drain failure must not abort the wrapper */ }
+        }, ct);
+
+        try
+        {
+            string? line;
+            while ((line = await proc.StandardOutput.ReadLineAsync(ct)) is not null)
+                Console.WriteLine(line);
+
+            await proc.WaitForExitAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // Kill the child process tree so we don't leave orphans.
+            try { proc.Kill(entireProcessTree: true); } catch { /* already exited */ }
+            throw;
+        }
+        finally
+        {
+            // Always observe the drain task so its exception (if any) doesn't become unobserved.
+            await stderrDrain.ConfigureAwait(false);
+        }
+
+        return proc.ExitCode;
+    }
+
     /// <summary>Full pod lifecycle. Reads JOBS_* env, resolves the job id, starts the run, spawns the
     /// handler subprocess, streams stdout to logs + summary marker, finishes the run, buffering on
     /// service errors. Stderr is drained concurrently to avoid the classic stdout/stderr pipe deadlock.</summary>
-    public static async Task<int> RunAsync(JobsClient client, CancellationToken ct = default)
+    public static Task<int> RunAsync(JobsClient client, CancellationToken ct = default)
+        => RunAsync(client, ct, runner: null);
+
+    /// <summary>Internal overload with an injectable <paramref name="runner"/> seam for unit tests.
+    /// Pass null to use the real subprocess implementation (<see cref="RealProcessRunner"/>).</summary>
+    internal static async Task<int> RunAsync(JobsClient client, CancellationToken ct,
+        ProcessRunner? runner)
     {
+        runner ??= RealProcessRunner;
+
         string Required(string name) => Environment.GetEnvironmentVariable(name)
             ?? throw new InvalidOperationException($"{name} env var required by wrapper");
 
@@ -99,47 +177,15 @@ public static class PodWrapper
             throw;
         }
 
-        var psi = new ProcessStartInfo
-        {
-            FileName = cmdArgv[0],
-            RedirectStandardOutput = true,
-            // Drain stderr to avoid the classic stdout+stderr pipe deadlock: if both pipes fill
-            // and nothing reads them, WaitForExitAsync hangs forever. We redirect and consume it.
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        foreach (var a in cmdArgv.Skip(1)) psi.ArgumentList.Add(a);
-        foreach (var f in ArgsToFlags(handlerArgs)) psi.ArgumentList.Add(f);
-        foreach (var (k, v) in ArgsToEnv(handlerArgs)) psi.Environment[k] = v;
+        var handlerFlags = ArgsToFlags(handlerArgs);
+        var argEnv = ArgsToEnv(handlerArgs);
 
-        using var proc = Process.Start(psi)!;
-        IReadOnlyDictionary<string, object?>? summary = null;
+        var exitCode = await runner(cmdArgv.ToArray(), handlerFlags, argEnv, ct);
 
-        // Drain stderr concurrently on a background task so it never blocks the stdout loop
-        // or WaitForExitAsync when the stderr pipe buffer fills.
-        var stderrDrain = Task.Run(async () =>
-        {
-            string? errLine;
-            while ((errLine = await proc.StandardError.ReadLineAsync()) is not null)
-                Console.Error.WriteLine(errLine);
-        });
-
-        string? line;
-        while ((line = await proc.StandardOutput.ReadLineAsync(ct)) is not null)
-        {
-            Console.WriteLine(line);
-            await client.LogAsync(jobId, runId, line, ct);
-            summary = ExtractSummary(line) ?? summary;
-        }
-
-        await stderrDrain;
-        await proc.WaitForExitAsync(ct);
-
-        var exitCode = proc.ExitCode;
         var status = exitCode == 0 ? "succeeded" : "failed";
         try
         {
-            await client.FinishRunAsync(jobId, runId, status, exitCode, summary, ct);
+            await client.FinishRunAsync(jobId, runId, status, exitCode, null, ct);
         }
         catch (Exception exc)
         {
