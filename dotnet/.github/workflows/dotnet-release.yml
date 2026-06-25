@@ -19,8 +19,14 @@ jobs:
         run: dotnet test dotnet/BrutalSystems.Jobs.slnx -c Release
       - name: Pack
         run: |
-          dotnet pack dotnet/src/BrutalSystems.Jobs.Core   -c Release -p:PackageVersion=$VERSION -o out
-          dotnet pack dotnet/src/BrutalSystems.Jobs.Client -c Release -p:PackageVersion=$VERSION -o out
-          dotnet pack dotnet/src/BrutalSystems.Jobs.Worker -c Release -p:PackageVersion=$VERSION -o out
-      - name: Publish to nuget.org (OIDC)
-        run: dotnet nuget push "out/*.nupkg" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          dotnet pack dotnet/src/BrutalSystems.Jobs.Core   -c Release -p:PackageVersion="$VERSION" -o out
+          dotnet pack dotnet/src/BrutalSystems.Jobs.Client -c Release -p:PackageVersion="$VERSION" -o out
+          dotnet pack dotnet/src/BrutalSystems.Jobs.Worker -c Release -p:PackageVersion="$VERSION" -o out
+      - name: NuGet login (OIDC → short-lived API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          # nuget.org username (profile name, NOT email). Set as a repo secret.
+          user: ${{ secrets.NUGET_USER }}
+      - name: Publish to nuget.org
+        run: dotnet nuget push "out/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
