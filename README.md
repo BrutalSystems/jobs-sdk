@@ -51,3 +51,7 @@ uv run ruff check .
 The Python and .NET SDKs version independently (tags `python-vX.Y.Z`,
 `dotnet-vX.Y.Z`) against the same wire contract. A breaking contract change is a
 coordinated major bump across both.
+
+## Mirror
+
+This repository is mirrored read-only (code + tags) to [`Springthrough/jobs-sdk`](https://github.com/Springthrough/jobs-sdk) by the **Mirror to Springthrough** GitHub Action (`.github/workflows/mirror.yml`). Every push force-syncs all branches and tags to the mirror. Do not edit the Springthrough copy directly — changes there are overwritten on the next sync.
