@@ -1,0 +1,34 @@
+name: Mirror to Springthrough
+
+# Read-only exact mirror of this repo into the Springthrough org.
+# Fires on every push to any branch/tag and on branch/tag deletion.
+# Auth: MIRROR_SSH_KEY secret = private half of a write deploy key on the target.
+on:
+  push:
+    branches: ['**']
+    tags: ['**']
+  delete:
+
+concurrency:
+  group: mirror-springthrough
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    # Guard: never run inside the mirrored copy in Springthrough.
+    if: github.repository == 'BrutalSystems/jobs-sdk'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH deploy key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.MIRROR_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Mirror branches and tags to Springthrough
+        run: |
+          git clone --bare "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" repo.git
+          cd repo.git
+          git push --prune git@github.com:Springthrough/jobs-sdk.git \
+            'refs/heads/*:refs/heads/*' 'refs/tags/*:refs/tags/*'
