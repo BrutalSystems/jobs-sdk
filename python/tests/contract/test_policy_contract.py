@@ -18,7 +18,8 @@ def test_policy_field_set_is_frozen():
     assert set(Policy.model_fields) == {
         "execution_mode", "concurrency", "resources", "image", "command",
         "env_from", "config_map_env_from", "timeout_seconds", "prefer_spot",
-        "node_arch", "service_account", "orchestrator_overrides", "dispatch_mode",
+        "node_arch", "service_account", "volumes", "volume_mounts",
+        "orchestrator_overrides", "dispatch_mode",
     }
 
 
@@ -31,7 +32,19 @@ def test_policy_defaults_are_frozen():
     assert p.timeout_seconds == 3600
     assert p.prefer_spot is False
     assert p.node_arch == "any"
+    assert p.volumes == []
+    assert p.volume_mounts == []
     assert p.dispatch_mode == "direct"
+
+
+def test_policy_accepts_volumes_and_mounts():
+    p = Policy(
+        execution_mode="container",
+        volumes=[{"name": "archive", "persistentVolumeClaim": {"claimName": "mailbox-archive-pvc"}}],
+        volume_mounts=[{"name": "archive", "mountPath": "/mnt/mailbox-archive", "readOnly": True}],
+    )
+    assert p.volumes[0]["persistentVolumeClaim"]["claimName"] == "mailbox-archive-pvc"
+    assert p.volume_mounts[0]["mountPath"] == "/mnt/mailbox-archive"
 
 
 def test_policy_dispatch_modes_are_frozen():

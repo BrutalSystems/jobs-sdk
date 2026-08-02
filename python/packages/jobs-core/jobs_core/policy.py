@@ -41,6 +41,14 @@ class Policy(BaseModel):
     prefer_spot: bool = False
     node_arch: str = "any"       # "any" | "arm64" | "amd64"
     service_account: str | None = None
+    # Extra pod volumes + container volume mounts for a direct-dispatch Job — e.g.
+    # an S3-CSI PVC the worker reads. Raw k8s specs (V1Volume / V1VolumeMount shape)
+    # passed straight into the pod template + container. First-class (rather than
+    # orchestrator_overrides) because the container lives in a LIST and the override
+    # deep-merge replaces lists, so a mount can't be added without clobbering the
+    # whole container. Ignored by the queued adapters.
+    volumes: list[dict[str, Any]] = Field(default_factory=list)
+    volume_mounts: list[dict[str, Any]] = Field(default_factory=list)
     orchestrator_overrides: dict[str, Any] = Field(default_factory=dict)
     # Route a triggered Run via direct k8s dispatch (default), or a queued path.
     # The trigger route reads this and routes to the right adapter.
