@@ -169,6 +169,8 @@ async def _run(*, client: JobsClient) -> int:
         summary: dict[str, Any] | None = None
         for line in proc.stdout:
             sys.stdout.write(line)
+            sys.stdout.flush()  # pod stdout is block-buffered; flush so logs
+            # tail live and a SIGKILL (eviction/OOM/deadline) can't drop the tail
             try:
                 await client.log(job_id=job_id, run_id=run_id, line=line.rstrip("\n"))
             except Exception:
